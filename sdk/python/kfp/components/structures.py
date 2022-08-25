@@ -25,11 +25,12 @@ from google.protobuf import json_format
 import kfp
 from kfp.compiler import compiler
 from kfp.components import base_model
-from kfp.components import pipeline_channel
 from kfp.components import placeholders
 from kfp.components import utils
 from kfp.components import v1_components
 from kfp.components import v1_structures
+from kfp.components.container_component_artifact_channel import \
+    ContainerComponentArtifactChannel
 from kfp.components.types import type_utils
 from kfp.pipeline_spec import pipeline_spec_pb2
 import yaml
@@ -178,20 +179,58 @@ class ResourceSpec(base_model.BaseModel):
 
 
 class ContainerSpec(base_model.BaseModel):
-    """Container implementation definition.
+    """Container definition.
 
-    Attributes:
-        image: The container image.
-        command (optional): the container entrypoint.
-        args (optional): the arguments to the container entrypoint.
-        env (optional): the environment variables to be passed to the container.
-        resources (optional): the specification on the resource requirements.
+    This is only used for pipeline authors when constructing a containerized component
+    using @container_component decorator.
+
+    Examples:
+      ::
+
+        @container_component
+        def container_with_artifact_output(
+            num_epochs: int,  # built-in types are parsed as inputs
+            model: Output[Model],
+            model_config_path: OutputPath(str),
+        ):
+            return ContainerSpec(
+                image='gcr.io/my-image',
+                command=['sh', 'run.sh'],
+                args=[
+                    '--epochs',
+                    num_epochs,
+                    '--model_path',
+                    model.uri,
+                    '--model_config_path',
+                    model_config_path,
+                ])
     """
     image: str
+    """Container image."""
+
     command: Optional[List[placeholders.CommandLineElement]] = None
+    """Container entrypoint."""
+
     args: Optional[List[placeholders.CommandLineElement]] = None
+    """Arguments to the container entrypoint."""
+
+
+class ContainerSpecImplementation(base_model.BaseModel):
+    """Container implementation definition."""
+    image: str
+    """Container image."""
+
+    command: Optional[List[placeholders.CommandLineElement]] = None
+    """Container entrypoint."""
+
+    args: Optional[List[placeholders.CommandLineElement]] = None
+    """Arguments to the container entrypoint."""
+
     env: Optional[Mapping[str, placeholders.CommandLineElement]] = None
+    """Environment variables to be passed to the container."""
+
     resources: Optional[ResourceSpec] = None
+    """Specification on the resource requirements."""
 
     def transform_command(self) -> None:
         """Use None instead of empty list for command."""
@@ -206,17 +245,29 @@ class ContainerSpec(base_model.BaseModel):
         self.env = None if self.env == {} else self.env
 
     @classmethod
-    def from_container_dict(cls, container_dict: Dict[str,
-                                                      Any]) -> 'ContainerSpec':
-        """Creates a ContainerSpec from a PipelineContainerSpec message in dict
-        format (pipeline_spec.deploymentSpec.executors.<executor-
-        key>.container).
+    def from_container_spec(
+            cls,
+            container_spec: ContainerSpec) -> 'ContainerSpecImplementation':
+        return ContainerSpecImplementation(
+            image=container_spec.image,
+            command=container_spec.command,
+            args=container_spec.args,
+            env=None,
+            resources=None)
+
+    @classmethod
+    def from_container_dict(
+            cls, container_dict: Dict[str,
+                                      Any]) -> 'ContainerSpecImplementation':
+        """Creates a ContainerSpecImplementation from a PipelineContainerSpec
+        message in dict format
+        (pipeline_spec.deploymentSpec.executors.<executor- key>.container).
 
         Args:
             container_dict (Dict[str, Any]): PipelineContainerSpec message in dict format.
 
         Returns:
-            ContainerSpec: The ContainerSpec instance.
+            ContainerSpecImplementation: The ContainerSpecImplementation instance.
         """
         args = container_dict.get('args')
         if args is not None:
@@ -230,7 +281,7 @@ class ContainerSpec(base_model.BaseModel):
                 placeholders.maybe_convert_placeholder_string_to_placeholder(c)
                 for c in command
             ]
-        return ContainerSpec(
+        return ContainerSpecImplementation(
             image=container_dict['image'],
             command=command,
             args=args,
@@ -350,7 +401,7 @@ class Implementation(base_model.BaseModel):
         graph: graph implementation details.
         importer: importer implementation details.
     """
-    container: Optional[ContainerSpec] = None
+    container: Optional[ContainerSpecImplementation] = None
     graph: Optional[DagSpec] = None
     importer: Optional[ImporterSpec] = None
 
@@ -369,7 +420,8 @@ class Implementation(base_model.BaseModel):
         """
         executor_key = utils._EXECUTOR_LABEL_PREFIX + component_name
         container = deployment_spec_dict['executors'][executor_key]['container']
-        container_spec = ContainerSpec.from_container_dict(container)
+        container_spec = ContainerSpecImplementation.from_container_dict(
+            container)
         return Implementation(container=container_spec)
 
 
@@ -389,16 +441,23 @@ def _check_valid_placeholder_reference(
         TypeError: if any argument is neither a str nor a placeholder
             instance.
     """
-    if isinstance(
+    if isinstance(placeholder, ContainerComponentArtifactChannel):
+        raise ValueError(
+            'Cannot access artifact by itself in the container definition. Please use .uri or .path instead to access the artifact.'
+        )
+    elif isinstance(
             placeholder,
         (placeholders.InputValuePlaceholder, placeholders.InputPathPlaceholder,
-         placeholders.InputUriPlaceholder)):
+         placeholders.InputUriPlaceholder,
+         placeholders.InputMetadataPlaceholder)):
         if placeholder.input_name not in valid_inputs:
             raise ValueError(
                 f'Argument "{placeholder}" references non-existing input.')
-    elif isinstance(placeholder, (placeholders.OutputParameterPlaceholder,
-                                  placeholders.OutputPathPlaceholder,
-                                  placeholders.OutputUriPlaceholder)):
+    elif isinstance(
+            placeholder,
+        (placeholders.OutputParameterPlaceholder,
+         placeholders.OutputPathPlaceholder, placeholders.OutputUriPlaceholder,
+         placeholders.OutputMetadataPlaceholder)):
         if placeholder.output_name not in valid_outputs:
             raise ValueError(
                 f'Argument "{placeholder}" references non-existing output.')
@@ -425,6 +484,8 @@ ValidCommandArgTypes = (str, placeholders.InputValuePlaceholder,
                         placeholders.InputUriPlaceholder,
                         placeholders.OutputPathPlaceholder,
                         placeholders.OutputUriPlaceholder,
+                        placeholders.InputMetadataPlaceholder,
+                        placeholders.OutputMetadataPlaceholder,
                         placeholders.IfPresentPlaceholder,
                         placeholders.ConcatPlaceholder)
 
@@ -465,14 +526,14 @@ class ComponentSpec(base_model.BaseModel):
         if getattr(implementation, 'container', None) is None:
             return
 
-        containerSpec: ContainerSpec = implementation.container
+        containerSpecImplementation: ContainerSpecImplementation = implementation.container
 
         valid_inputs = [] if self.inputs is None else list(self.inputs.keys())
         valid_outputs = [] if self.outputs is None else list(
             self.outputs.keys())
 
-        for arg in itertools.chain((containerSpec.command or []),
-                                   (containerSpec.args or [])):
+        for arg in itertools.chain((containerSpecImplementation.command or []),
+                                   (containerSpecImplementation.args or [])):
             _check_valid_placeholder_reference(valid_inputs, valid_outputs, arg)
 
     @classmethod
@@ -518,7 +579,7 @@ class ComponentSpec(base_model.BaseModel):
                 command, component_dict=component_dict)
             for key, command in container.get('env', {}).items()
         }
-        container_spec = ContainerSpec.from_container_dict({
+        container_spec = ContainerSpecImplementation.from_container_dict({
             'image': container['image'],
             'command': container['command'],
             'args': container['args'],
@@ -680,7 +741,7 @@ class ComponentSpec(base_model.BaseModel):
 
         # Fill in the default values.
         args_list_with_defaults = [
-            pipeline_channel.PipelineParameterChannel(
+            pipeline_channel.create_pipeline_channel(
                 name=input_name,
                 channel_type=input_spec.type,
                 value=input_spec.default,

@@ -1,19 +1,54 @@
 # Current Version (Still in Development)
 
 ## Major Features and Improvements
+* Support parallelism setting in ParallelFor [\#8146](https://github.com/kubeflow/pipelines/pull/8146)
+* Support for Python v3.10 [\#8186](https://github.com/kubeflow/pipelines/pull/8186)
 
 ## Breaking Changes
 
 ### For Pipeline Authors
-* Add support for task-level retry policy [\#7867](https://github.com/kubeflow/pipelines/pull/7867)
 
 ### For Component Authors
 
 ## Deprecations
 
 ## Bug Fixes and Other Changes
+
+## Documentation Updates
+# 2.0.0-beta.3
+
+## Major Features and Improvements
+
+## Breaking Changes
+
+### For Pipeline Authors
+
+### For Component Authors
+* Add support for ConcatPlaceholder and IfPresentPlaceholder in containerized component [\#8145](https://github.com/kubeflow/pipelines/pull/8145)
+## Deprecations
+
+## Bug Fixes and Other Changes
+
+## Documentation Updates
+
+# 2.0.0-beta.2
+
+## Major Features and Improvements
+
+## Breaking Changes
+
+### For Pipeline Authors
+
+### For Component Authors
+* Add support for containerized component [\#8066](https://github.com/kubeflow/pipelines/pull/8066)
+
+## Deprecations
+
+## Bug Fixes and Other Changes
 * Enable overriding caching options at submission time [\#7912](https://github.com/kubeflow/pipelines/pull/7912)
 * Allow artifact inputs in pipeline definition. [\#8044](https://github.com/kubeflow/pipelines/pull/8044)
+* Support task-level retry policy [\#7867](https://github.com/kubeflow/pipelines/pull/7867)
+* Support multiple exit handlers per pipeline [\#8088](https://github.com/kubeflow/pipelines/pull/8088)
 
 ## Documentation Updates
 
