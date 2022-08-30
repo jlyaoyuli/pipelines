@@ -1,21 +1,62 @@
 # Current Version (Still in Development)
 
 ## Major Features and Improvements
+* Support parallelism setting in ParallelFor [\#8146](https://github.com/kubeflow/pipelines/pull/8146)
+* Support for Python v3.10 [\#8186](https://github.com/kubeflow/pipelines/pull/8186)
+* Support pipeline as a component [\#8179](https://github.com/kubeflow/pipelines/pull/8179), [\#8204](https://github.com/kubeflow/pipelines/pull/8204)
 
 ## Breaking Changes
 
 ### For Pipeline Authors
-* Add support for task-level retry policy [\#7867](https://github.com/kubeflow/pipelines/pull/7867)
+* Pipeline compilation is now triggered from `@pipeline` decorator instead of `Compiler.compile()` method. 
+Technically no breaking changes but compilation error could be exposed in a different (and earlier) stage. [\#8179](https://github.com/kubeflow/pipelines/pull/8179)
 
 ### For Component Authors
 
 ## Deprecations
 
 ## Bug Fixes and Other Changes
-* Enable overriding caching options at submission time [\#7912](https://github.com/kubeflow/pipelines/pull/7912)
 
 ## Documentation Updates
-# Current Version (2.0.0-beta.1)
+
+# 2.0.0-beta.3
+
+## Major Features and Improvements
+
+## Breaking Changes
+
+### For Pipeline Authors
+
+### For Component Authors
+* Add support for ConcatPlaceholder and IfPresentPlaceholder in containerized component [\#8145](https://github.com/kubeflow/pipelines/pull/8145)
+## Deprecations
+
+## Bug Fixes and Other Changes
+
+## Documentation Updates
+
+# 2.0.0-beta.2
+
+## Major Features and Improvements
+
+## Breaking Changes
+
+### For Pipeline Authors
+
+### For Component Authors
+* Add support for containerized component [\#8066](https://github.com/kubeflow/pipelines/pull/8066)
+
+## Deprecations
+
+## Bug Fixes and Other Changes
+* Enable overriding caching options at submission time [\#7912](https://github.com/kubeflow/pipelines/pull/7912)
+* Allow artifact inputs in pipeline definition. [\#8044](https://github.com/kubeflow/pipelines/pull/8044)
+* Support task-level retry policy [\#7867](https://github.com/kubeflow/pipelines/pull/7867)
+* Support multiple exit handlers per pipeline [\#8088](https://github.com/kubeflow/pipelines/pull/8088)
+
+## Documentation Updates
+
+# 2.0.0-beta.1
 
 ## Major Features and Improvements
 
@@ -31,6 +72,7 @@
 * Include default registry context JSON in package distribution [\#7987](https://github.com/kubeflow/pipelines/pull/7987)
 
 ## Documentation Updates
+
 # 2.0.0-beta.0
 
 ## Major Features and Improvements
