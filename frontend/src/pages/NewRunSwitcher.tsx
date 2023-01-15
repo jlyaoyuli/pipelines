@@ -12,7 +12,6 @@ import { isTemplateV2 } from 'src/lib/v2/WorkflowUtils';
 import { ApiPipeline, ApiPipelineVersion } from 'src/apis/pipeline';
 import { ApiRunDetail } from 'src/apis/run';
 import { ApiExperiment } from 'src/apis/experiment';
-import { ApiJob } from 'src/apis/job';
 
 function NewRunSwitcher(props: PageProps) {
   const namespace = React.useContext(NamespaceContext);
@@ -24,7 +23,6 @@ function NewRunSwitcher(props: PageProps) {
   // runID query by cloneFromRun will be deprecated once v1 is deprecated.
   const originalRunId = urlParser.get(QUERY_PARAMS.cloneFromRun);
   const embeddedRunId = urlParser.get(QUERY_PARAMS.fromRunId);
-  const originalRecurringRunId = urlParser.get(QUERY_PARAMS.cloneFromRecurringRun);
   const [pipelineId, setPipelineId] = useState(urlParser.get(QUERY_PARAMS.pipelineId));
   const experimentId = urlParser.get(QUERY_PARAMS.experimentId);
   const [pipelineVersionIdParam, setPipelineVersionIdParam] = useState(
@@ -32,8 +30,7 @@ function NewRunSwitcher(props: PageProps) {
   );
   const existingRunId = originalRunId ? originalRunId : embeddedRunId;
 
-  // Retrieve run details
-  const { isSuccess: getRunSuccess, isFetching: runIsFetching, data: apiRun } = useQuery<
+  const { isSuccess: runIsSuccess, isFetching: runIsFetching, data: apiRun } = useQuery<
     ApiRunDetail,
     Error
   >(
@@ -46,32 +43,7 @@ function NewRunSwitcher(props: PageProps) {
     },
     { enabled: !!existingRunId, staleTime: Infinity },
   );
-
-  // Retrieve recurring run details
-  const {
-    isSuccess: getRecurringRunSuccess,
-    isFetching: recurringRunIsFetching,
-    data: apiRecurringRun,
-  } = useQuery<ApiJob, Error>(
-    ['ApiRecurringRun', originalRecurringRunId],
-    () => {
-      if (!originalRecurringRunId) {
-        throw new Error('Recurring Run ID is missing');
-      }
-      return Apis.jobServiceApi.getJob(originalRecurringRunId);
-    },
-    { enabled: !!originalRecurringRunId, staleTime: Infinity },
-  );
-
-  if (apiRun !== undefined && apiRecurringRun !== undefined) {
-    throw new Error('The existence of run and recurring run should be exclusive.');
-  }
-
-  // template string from cloned object
-  let pipelineManifest = apiRun?.run?.pipeline_spec?.pipeline_manifest;
-  if (getRecurringRunSuccess && apiRecurringRun) {
-    pipelineManifest = apiRecurringRun.pipeline_spec?.pipeline_manifest;
-  }
+  const templateStrFromRunId = apiRun ? apiRun.run?.pipeline_spec?.pipeline_manifest : '';
 
   const { isFetching: pipelineIsFetching, data: apiPipeline } = useQuery<ApiPipeline, Error>(
     ['ApiPipeline', pipelineId],
@@ -127,21 +99,17 @@ function NewRunSwitcher(props: PageProps) {
     { enabled: !!experimentId, staleTime: Infinity },
   );
 
-  const templateString = pipelineManifest ? pipelineManifest : templateStrFromPipelineId;
+  const templateString =
+    templateStrFromRunId === '' ? templateStrFromPipelineId : templateStrFromRunId;
 
   if (isFeatureEnabled(FeatureKey.V2_ALPHA)) {
-    if (
-      (getRunSuccess || getRecurringRunSuccess || isTemplatePullSuccessFromPipeline) &&
-      isTemplateV2(templateString || '')
-    ) {
+    if ((runIsSuccess || isTemplatePullSuccessFromPipeline) && isTemplateV2(templateString || '')) {
       return (
         <NewRunV2
           {...props}
           namespace={namespace}
           existingRunId={existingRunId}
           apiRun={apiRun}
-          originalRecurringRunId={originalRecurringRunId}
-          apiRecurringRun={apiRecurringRun}
           existingPipeline={apiPipeline}
           handlePipelineIdChange={setPipelineId}
           existingPipelineVersion={apiPipelineVersion}
@@ -158,7 +126,6 @@ function NewRunSwitcher(props: PageProps) {
   // TODO(jlyaoyuli): set v2 as default once v1 is deprecated.
   if (
     runIsFetching ||
-    recurringRunIsFetching ||
     pipelineIsFetching ||
     pipelineVersionIsFetching ||
     pipelineTemplateStrIsFetching
