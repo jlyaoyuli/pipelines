@@ -24,7 +24,6 @@ import CustomTable, {
 } from '../components/CustomTable';
 import RunList from './RunList';
 import produce from 'immer';
-import { ApiFilter, PredicateOp } from '../apis/filter';
 import {
   V2beta1ListExperimentsResponse,
   V2beta1Experiment,
@@ -43,6 +42,7 @@ import { logger } from '../lib/Utils';
 import { statusToIcon } from './Status';
 import Tooltip from '@material-ui/core/Tooltip';
 import { NamespaceContext } from 'src/lib/KubeflowClient';
+import { V2beta1Filter, V2beta1PredicateOperation } from 'src/apisv2beta1/filter';
 
 interface DisplayExperiment extends V2beta1Experiment {
   last5Runs?: ApiRun[];
@@ -186,11 +186,11 @@ export class ExperimentList extends Page<{ namespace?: string }, ExperimentListS
       // Archived experiments are listed in "Archive" page.
       const filter = JSON.parse(
         decodeURIComponent(request.filter || '{"predicates": []}'),
-      ) as ApiFilter;
+      ) as V2beta1Filter;
       filter.predicates = (filter.predicates || []).concat([
         {
           key: 'storage_state',
-          op: PredicateOp.NOTEQUALS,
+          operation: V2beta1PredicateOperation.NOTEQUALS,
           string_value: V2beta1ExperimentStorageState.ARCHIVED.toString(),
         },
       ]);
@@ -227,11 +227,11 @@ export class ExperimentList extends Page<{ namespace?: string }, ExperimentListS
                 predicates: [
                   {
                     key: 'storage_state',
-                    op: PredicateOp.NOTEQUALS,
+                    operation: V2beta1PredicateOperation.NOTEQUALS,
                     string_value: ApiRunStorageState.ARCHIVED.toString(),
                   },
                 ],
-              } as ApiFilter),
+              } as V2beta1Filter),
             ),
           );
           experiment.last5Runs = listRunsResponse.runs || [];
